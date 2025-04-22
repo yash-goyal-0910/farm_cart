@@ -17,13 +17,34 @@
     
     <main class="container mx-auto p-4">
         <h2 class="text-xl font-semibold mb-4">Available Products</h2>
+        
+        <!-- Search and Filter Form -->
+        <form method="GET" action="{{ url_for('index') }}" class="mb-6 flex flex-col md:flex-row gap-4">
+            <div class="flex-1">
+                <label for="search" class="block text-sm font-medium text-gray-700">Search Products</label>
+                <input type="text" id="search" name="search" value="{{ search_query }}" placeholder="Search by name or description..." class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+            </div>
+            <div class="flex-1">
+                <label for="farmer" class="block text-sm font-medium text-gray-700">Filter by Farmer</label>
+                <select id="farmer" name="farmer" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                    <option value="">All Farmers</option>
+                    {% for farmer in farmers %}
+                        <option value="{{ farmer.name }}" {% if farmer_filter == farmer.name %}selected{% endif %}>{{ farmer.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-end">
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Search</button>
+            </div>
+        </form>
+
         {% if products %}
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {% for product in products %}
                     <div class="bg-white p-4 rounded shadow">
                         <h3 class="text-lg font-semibold">{{ product.name }}</h3>
                         <p class="text-gray-600">{{ product.description or 'No description' }}</p>
-                        <p class="text-green-600 font-bold">₹{{ product.price }}</p>
+                        <p class="text-green-600 font-bold">${{ product.price }}</p>
                         <p class="text-gray-500">Available: {{ product.quantity }} units</p>
                         <p class="text-gray-500">Farmer: {{ product.farmer.name }}</p>
                         <a href="{{ url_for('order', product_id=product.id) }}" class="mt-2 inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Order</a>
@@ -31,7 +52,7 @@
                 {% endfor %}
             </div>
         {% else %}
-            <p class="text-gray-500">No products available.</p>
+            <p class="text-gray-500">No products found.</p>
         {% endif %}
     </main>
 </body>

@@ -6,6 +6,7 @@ from datetime import datetime
 import os
 import logging
 from sqlalchemy.exc import OperationalError
+from sqlalchemy import or_
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -49,6 +50,7 @@ class Product(db.Model):
     price = db.Column(db.Float, nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     farmer_id = db.Column(db.Integer, db.ForeignKey('farmer.id'), nullable=False)
+    shipping_option = db.Column(db.String(50), nullable=False)
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -77,9 +79,32 @@ except OperationalError as e:
 @app.route('/')
 def index():
     try:
-        products = Product.query.all()
-        logger.info(f"Retrieved {len(products)} products from database")
-        return render_template('index.html', products=products)
+        # Get search and filter parameters
+        search_query = request.args.get('search', '').strip()
+        farmer_filter = request.args.get('farmer', '').strip()
+
+        # Base query
+        query = Product.query
+
+        # Apply search filter (name or description)
+        if search_query:
+            search_term = f'%{search_query}%'
+            query = query.filter(or_(
+                Product.name.ilike(search_term),
+                Product.description.ilike(search_term)
+            ))
+
+        # Apply farmer filter
+        if farmer_filter:
+            query = query.join(Farmer).filter(Farmer.name.ilike(f'%{farmer_filter}%'))
+
+        products = query.all()
+
+        # Get all farmers for filter dropdown
+        farmers = Farmer.query.all()
+
+        logger.info(f"Retrieved {len(products)} products with search: '{search_query}', farmer: '{farmer_filter}'")
+        return render_template('index.html', products=products, farmers=farmers, search_query=search_query, farmer_filter=farmer_filter)
     except OperationalError as e:
         logger.error(f"Error querying products: {e}")
         return jsonify({'error': 'Database error, please try again later'}), 500
@@ -206,9 +231,14 @@ def add_product():
         description = data.get('description')
         price = data.get('price')
         quantity = data.get('quantity')
+        shipping_option = data.get('shipping_option')
         
-        if not all([name, price, quantity]):
-            flash('Name, price, and quantity are required', 'error')
+        if not all([name, price, quantity, shipping_option]):
+            flash('Name, price, quantity, and shipping option are required', 'error')
+            return redirect(url_for('profile', farmer_id=current_user.id))
+        
+        if shipping_option not in ['Self Ship', 'Shiprocket']:
+            flash('Invalid shipping option', 'error')
             return redirect(url_for('profile', farmer_id=current_user.id))
         
         try:
@@ -226,11 +256,12 @@ def add_product():
             description=description,
             price=price,
             quantity=quantity,
-            farmer_id=current_user.id
+            farmer_id=current_user.id,
+            shipping_option=shipping_option
         )
         db.session.add(product)
         db.session.commit()
-        logger.info(f"Added product: {name} by farmer ID: {current_user.id}")
+        logger.info(f"Added product: {name} by farmer ID: {current_user.id} with shipping: {shipping_option}")
         flash('Product added successfully!', 'success')
         return redirect(url_for('profile', farmer_id=current_user.id))
     except Exception as e:
@@ -356,19 +387,23 @@ def update_farmer(farmer_id):
 def api_add_product():
     try:
         data = request.get_json()
-        if not data or not all(key in data for key in ['name', 'price', 'quantity']):
+        if not data or not all(key in data for key in ['name', 'price', 'quantity', 'shipping_option']):
             return jsonify({'error': 'Missing required fields'}), 400
+        
+        if data['shipping_option'] not in ['Self Ship', 'Shiprocket']:
+            return jsonify({'error': 'Invalid shipping option'}), 400
         
         product = Product(
             name=data['name'],
             description=data.get('description'),
             price=data['price'],
             quantity=data['quantity'],
-            farmer_id=current_user.id
+            farmer_id=current_user.id,
+            shipping_option=data['shipping_option']
         )
         db.session.add(product)
         db.session.commit()
-        logger.info(f"Added product via API: {data['name']}")
+        logger.info(f"Added product via API: {data['name']} with shipping: {data['shipping_option']}")
         return jsonify({'message': 'Product added successfully', 'id': product.id}), 201
     except Exception as e:
         logger.error(f"Error adding product: {e}")
@@ -386,7 +421,8 @@ def get_products():
             'description': p.description,
             'price': p.price,
             'quantity': p.quantity,
-            'farmer': p.farmer.name if p.farmer else 'Unknown'
+            'farmer': p.farmer.name if p.farmer else 'Unknown',
+            'shipping_option': p.shipping_option
         } for p in products])
     except Exception as e:
         logger.error(f"Error retrieving products: {e}")
