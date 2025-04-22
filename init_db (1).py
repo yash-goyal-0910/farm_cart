@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime
+from werkzeug.security import generate_password_hash
 
 # Connect to SQLite database (creates farmers_market.db if it doesn't exist)
 conn = sqlite3.connect('farmers_market.db')
@@ -11,6 +12,7 @@ cursor.execute('''
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
         phone TEXT,
         address TEXT
     )
@@ -44,12 +46,14 @@ cursor.execute('''
 ''')
 
 # Insert sample data
-# Farmers
+# Farmers (with hashed passwords)
+default_password = "default123"
+password_hash = generate_password_hash(default_password)
 cursor.executemany('''
-    INSERT OR IGNORE INTO farmer (name, email, phone, address) VALUES (?, ?, ?, ?)
+    INSERT OR IGNORE INTO farmer (name, email, password_hash, phone, address) VALUES (?, ?, ?, ?, ?)
 ''', [
-    ('John Doe', 'john@example.com', '123-456-7890', '123 Farm Road, Ruralville'),
-    ('Jane Smith', 'jane@example.com', '098-765-4321', '456 Orchard Lane, Agritown')
+    ('John Doe', 'john@example.com', password_hash, '123-456-7890', '123 Farm Road, Ruralville'),
+    ('Jane Smith', 'jane@example.com', password_hash, '098-765-4321', '456 Orchard Lane, Agritown')
 ])
 
 # Products

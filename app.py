@@ -1,5 +1,7 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import os
 import logging
@@ -11,21 +13,34 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Set database URI using absolute path for reliability
+# Set database URI and secret key
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, 'farmers_market.db'))
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')  # Change in production
 db = SQLAlchemy(app)
 
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
 # Models
-class Farmer(db.Model):
+class Farmer(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
     phone = db.Column(db.String(20))
     address = db.Column(db.String(200))
     products = db.relationship('Product', backref='farmer', lazy=True)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -45,7 +60,11 @@ class Order(db.Model):
     order_date = db.Column(db.DateTime, default=datetime.utcnow)
     product = db.relationship('Product', backref='orders')
 
-# Create database tables if they don't exist
+@login_manager.user_loader
+def load_user(user_id):
+    return Farmer.query.get(int(user_id))
+
+# Create database tables
 try:
     with app.app_context():
         db.create_all()
@@ -65,8 +84,51 @@ def index():
         logger.error(f"Error querying products: {e}")
         return jsonify({'error': 'Database error, please try again later'}), 500
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('profile', farmer_id=current_user.id))
+    
+    if request.method == 'POST':
+        try:
+            data = request.form
+            email = data.get('email')
+            password = data.get('password')
+            
+            if not email or not password:
+                flash('Email and password are required', 'error')
+                return render_template('login.html')
+            
+            farmer = Farmer.query.filter_by(email=email).first()
+            if farmer and farmer.check_password(password):
+                login_user(farmer)
+                logger.info(f"Farmer logged in: {email}")
+                return redirect(url_for('profile', farmer_id=farmer.id))
+            else:
+                flash('Invalid email or password', 'error')
+                return render_template('login.html')
+        except Exception as e:
+            logger.error(f"Error during login: {e}")
+            flash('An error occurred, please try again', 'error')
+            return render_template('login.html')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    logger.info("Farmer logged out")
+    flash('You have been logged out', 'success')
+    return redirect(url_for('login'))
+
 @app.route('/profile/<int:farmer_id>')
+@login_required
 def profile(farmer_id):
+    if current_user.id != farmer_id:
+        flash('You can only access your own profile', 'error')
+        return redirect(url_for('profile', farmer_id=current_user.id))
+    
     try:
         farmer = Farmer.query.get_or_404(farmer_id)
         products = Product.query.filter_by(farmer_id=farmer_id).all()
@@ -81,7 +143,7 @@ def profile(farmer_id):
 def register_farmer():
     try:
         data = request.get_json()
-        if not data or 'email' not in data or 'name' not in data:
+        if not data or not all(key in data for key in ['email', 'name', 'password']):
             return jsonify({'error': 'Missing required fields'}), 400
         
         if Farmer.query.filter_by(email=data['email']).first():
@@ -93,6 +155,7 @@ def register_farmer():
             phone=data.get('phone'),
             address=data.get('address')
         )
+        farmer.set_password(data['password'])
         db.session.add(farmer)
         db.session.commit()
         logger.info(f"Registered farmer: {data['email']}")
@@ -103,7 +166,11 @@ def register_farmer():
         return jsonify({'error': 'Failed to register farmer'}), 500
 
 @app.route('/api/farmers/<int:farmer_id>', methods=['PUT'])
+@login_required
 def update_farmer(farmer_id):
+    if current_user.id != farmer_id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
     try:
         data = request.get_json()
         farmer = Farmer.query.get_or_404(farmer_id)
@@ -122,10 +189,11 @@ def update_farmer(farmer_id):
         return jsonify({'error': 'Failed to update profile'}), 500
 
 @app.route('/api/products', methods=['POST'])
+@login_required
 def add_product():
     try:
         data = request.get_json()
-        if not data or not all(key in data for key in ['name', 'price', 'quantity', 'farmer_id']):
+        if not data or not all(key in data for key in ['name', 'price', 'quantity']):
             return jsonify({'error': 'Missing required fields'}), 400
         
         product = Product(
@@ -133,7 +201,7 @@ def add_product():
             description=data.get('description'),
             price=data['price'],
             quantity=data['quantity'],
-            farmer_id=data['farmer_id']
+            farmer_id=current_user.id
         )
         db.session.add(product)
         db.session.commit()
@@ -190,7 +258,11 @@ def place_order():
         return jsonify({'error': 'Failed to place order'}), 500
 
 @app.route('/api/farmers/<int:farmer_id>/orders', methods=['GET'])
+@login_required
 def get_farmer_orders(farmer_id):
+    if current_user.id != farmer_id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
     try:
         orders = Order.query.join(Product).filter(Product.farmer_id == farmer_id).all()
         logger.info(f"Retrieved {len(orders)} orders for farmer ID: {farmer_id}")
