@@ -114,6 +114,43 @@ def login():
     
     return render_template('login.html')
 
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if current_user.is_authenticated:
+        return redirect(url_for('profile', farmer_id=current_user.id))
+    
+    if request.method == 'POST':
+        try:
+            data = request.form
+            name = data.get('name')
+            email = data.get('email')
+            password = data.get('password')
+            phone = data.get('phone')
+            address = data.get('address')
+            
+            if not all([name, email, password]):
+                flash('Name, email, and password are required', 'error')
+                return render_template('signup.html')
+            
+            if Farmer.query.filter_by(email=email).first():
+                flash('Email already registered', 'error')
+                return render_template('signup.html')
+            
+            farmer = Farmer(name=name, email=email, phone=phone, address=address)
+            farmer.set_password(password)
+            db.session.add(farmer)
+            db.session.commit()
+            logger.info(f"Registered farmer via signup: {email}")
+            flash('Registration successful! Please log in.', 'success')
+            return redirect(url_for('login'))
+        except Exception as e:
+            logger.error(f"Error during signup: {e}")
+            db.session.rollback()
+            flash('An error occurred, please try again', 'error')
+            return render_template('signup.html')
+    
+    return render_template('signup.html')
+
 @app.route('/logout')
 @login_required
 def logout():
@@ -158,7 +195,7 @@ def register_farmer():
         farmer.set_password(data['password'])
         db.session.add(farmer)
         db.session.commit()
-        logger.info(f"Registered farmer: {data['email']}")
+        logger.info(f"Registered farmer via API: {data['email']}")
         return jsonify({'message': 'Farmer registered successfully', 'id': farmer.id}), 201
     except Exception as e:
         logger.error(f"Error registering farmer: {e}")
