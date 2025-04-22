@@ -109,10 +109,20 @@ def index():
         logger.error(f"Error querying products: {e}")
         return jsonify({'error': 'Database error, please try again later'}), 500
 
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    try:
+        logger.info(f"Retrieved dashboard for farmer ID: {current_user.id}")
+        return render_template('dashboard.html')
+    except OperationalError as e:
+        logger.error(f"Error retrieving dashboard: {e}")
+        return jsonify({'error': 'Database error, please try again later'}), 500
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('profile', farmer_id=current_user.id))
+        return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
         try:
@@ -128,7 +138,7 @@ def login():
             if farmer and farmer.check_password(password):
                 login_user(farmer)
                 logger.info(f"Farmer logged in: {email}")
-                return redirect(url_for('profile', farmer_id=farmer.id))
+                return redirect(url_for('dashboard'))
             else:
                 flash('Invalid email or password', 'error')
                 return render_template('login.html')
@@ -142,7 +152,7 @@ def login():
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if current_user.is_authenticated:
-        return redirect(url_for('profile', farmer_id=current_user.id))
+        return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
         try:
