@@ -8,17 +8,13 @@
 </head>
 <body class="bg-gray-100">
     <header class="bg-green-600 text-white p-4">
-      <h1 class="text-2xl font-bold">Farmers Market Platform</h1>
-      <nav class="mt-2">
-        <a href="{{ url_for('index') }}" class="text-white hover:underline mr-4"
-          >Home</a
-        >
-        <a href="{{ url_for('logout') }}" class="text-white hover:underline"
-          >Logout</a
-        >
-      </nav>
+        <h1 class="text-2xl font-bold">Farmers Market Platform</h1>
+        <nav class="mt-2">
+            <a href="{{ url_for('index') }}" class="text-white hover:underline mr-4">Home</a>
+            <a href="{{ url_for('logout') }}" class="text-white hover:underline">Logout</a>
+        </nav>
     </header>
-
+    
     <main class="container mx-auto p-4">
         <h2 class="text-xl font-semibold mb-4">Farmer Profile</h2>
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -140,47 +136,6 @@
                 <p class="text-gray-500">No orders yet.</p>
             {% endif %}
         </div>
-        {% else %}
-        <p class="text-gray-500">No products listed.</p>
-        {% endif %}
-      </div>
-
-      <!-- Orders -->
-      <div class="bg-white p-4 rounded shadow">
-        <h3 class="text-lg font-semibold mb-2">Your Orders</h3>
-        {% if orders %}
-        <table class="w-full text-left">
-          <thead>
-            <tr class="bg-gray-200">
-              <th class="p-2">Order ID</th>
-              <th class="p-2">Buyer</th>
-              <th class="p-2">Product</th>
-              <th class="p-2">Quantity</th>
-              <th class="p-2">Status</th>
-              <th class="p-2">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for order in orders %}
-            <tr class="border-t">
-              <td class="p-2">{{ order.id }}</td>
-              <td class="p-2">
-                {{ order.buyer_name }} ({{ order.buyer_email }})
-              </td>
-              <td class="p-2">{{ order.product.name }}</td>
-              <td class="p-2">{{ order.quantity }}</td>
-              <td class="p-2">{{ order.status }}</td>
-              <td class="p-2">
-                {{ order.order_date.strftime('%Y-%m-%d %H:%M') }}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <p class="text-gray-500">No orders received.</p>
-        {% endif %}
-      </div>
     </main>
 </body>
 </html>
