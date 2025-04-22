@@ -28,7 +28,7 @@
                     {% endfor %}
                 {% endif %}
             {% endwith %}
-            <p class="mb-2"><strong>Price:</strong> ${{ product.price }}</p>
+            <p class="mb-2"><strong>Price:</strong> ₹{{ product.price }}</p>
             <p class="mb-4"><strong>Available:</strong> {{ product.quantity }} units</p>
             <form method="POST" action="{{ url_for('order', product_id=product.id) }}">
                 <div class="mb-4">
