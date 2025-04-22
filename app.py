@@ -151,6 +151,53 @@ def signup():
     
     return render_template('signup.html')
 
+@app.route('/order/<int:product_id>', methods=['GET', 'POST'])
+def order(product_id):
+    try:
+        product = Product.query.get_or_404(product_id)
+        
+        if request.method == 'POST':
+            data = request.form
+            buyer_name = data.get('buyer_name')
+            buyer_email = data.get('buyer_email')
+            quantity = data.get('quantity')
+            
+            if not all([buyer_name, buyer_email, quantity]):
+                flash('All fields are required', 'error')
+                return render_template('order.html', product=product)
+            
+            try:
+                quantity = int(quantity)
+                if quantity <= 0:
+                    flash('Quantity must be greater than zero', 'error')
+                    return render_template('order.html', product=product)
+            except ValueError:
+                flash('Quantity must be a valid number', 'error')
+                return render_template('order.html', product=product)
+            
+            if product.quantity < quantity:
+                flash('Insufficient quantity available', 'error')
+                return render_template('order.html', product=product)
+            
+            order = Order(
+                buyer_name=buyer_name,
+                buyer_email=buyer_email,
+                product_id=product_id,
+                quantity=quantity
+            )
+            product.quantity -= quantity
+            db.session.add(order)
+            db.session.commit()
+            logger.info(f"Order placed for product ID: {product_id} by {buyer_email}")
+            flash('Order placed successfully!', 'success')
+            return redirect(url_for('index'))
+        
+        return render_template('order.html', product=product)
+    except Exception as e:
+        logger.error(f"Error processing order for product {product_id}: {e}")
+        flash('An error occurred, please try again', 'error')
+        return render_template('order.html', product=product)
+
 @app.route('/logout')
 @login_required
 def logout():
