@@ -198,6 +198,48 @@ def order(product_id):
         flash('An error occurred, please try again', 'error')
         return render_template('order.html', product=product)
 
+@app.route('/add_product', methods=['POST'])
+@login_required
+def add_product():
+    try:
+        data = request.form
+        name = data.get('name')
+        description = data.get('description')
+        price = data.get('price')
+        quantity = data.get('quantity')
+        
+        if not all([name, price, quantity]):
+            flash('Name, price, and quantity are required', 'error')
+            return redirect(url_for('profile', farmer_id=current_user.id))
+        
+        try:
+            price = float(price)
+            quantity = int(quantity)
+            if price <= 0 or quantity <= 0:
+                flash('Price and quantity must be greater than zero', 'error')
+                return redirect(url_for('profile', farmer_id=current_user.id))
+        except ValueError:
+            flash('Price and quantity must be valid numbers', 'error')
+            return redirect(url_for('profile', farmer_id=current_user.id))
+        
+        product = Product(
+            name=name,
+            description=description,
+            price=price,
+            quantity=quantity,
+            farmer_id=current_user.id
+        )
+        db.session.add(product)
+        db.session.commit()
+        logger.info(f"Added product: {name} by farmer ID: {current_user.id}")
+        flash('Product added successfully!', 'success')
+        return redirect(url_for('profile', farmer_id=current_user.id))
+    except Exception as e:
+        logger.error(f"Error adding product: {e}")
+        db.session.rollback()
+        flash('An error occurred, please try again', 'error')
+        return redirect(url_for('profile', farmer_id=current_user.id))
+
 @app.route('/logout')
 @login_required
 def logout():
@@ -274,7 +316,7 @@ def update_farmer(farmer_id):
 
 @app.route('/api/products', methods=['POST'])
 @login_required
-def add_product():
+def api_add_product():
     try:
         data = request.get_json()
         if not data or not all(key in data for key in ['name', 'price', 'quantity']):
@@ -289,7 +331,7 @@ def add_product():
         )
         db.session.add(product)
         db.session.commit()
-        logger.info(f"Added product: {data['name']}")
+        logger.info(f"Added product via API: {data['name']}")
         return jsonify({'message': 'Product added successfully', 'id': product.id}), 201
     except Exception as e:
         logger.error(f"Error adding product: {e}")
