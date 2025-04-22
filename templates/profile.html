@@ -87,7 +87,7 @@
                         <div class="border p-4 rounded">
                             <h4 class="text-md font-semibold">{{ product.name }}</h4>
                             <p class="text-gray-600">{{ product.description or 'No description' }}</p>
-                            <p class="text-green-600 font-bold">${{ product.price }}</p>
+                            <p class="text-green-600 font-bold">₹{{ product.price }}</p>
                             <p class="text-gray-500">Available: {{ product.quantity }} units</p>
                         </div>
                     {% endfor %}
