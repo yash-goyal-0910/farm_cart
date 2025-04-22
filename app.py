@@ -152,18 +152,17 @@ def signup():
     return render_template('signup.html')
 
 @app.route('/order/<int:product_id>', methods=['GET', 'POST'])
+@login_required
 def order(product_id):
     try:
         product = Product.query.get_or_404(product_id)
         
         if request.method == 'POST':
             data = request.form
-            buyer_name = data.get('buyer_name')
-            buyer_email = data.get('buyer_email')
             quantity = data.get('quantity')
             
-            if not all([buyer_name, buyer_email, quantity]):
-                flash('All fields are required', 'error')
+            if not quantity:
+                flash('Quantity is required', 'error')
                 return render_template('order.html', product=product)
             
             try:
@@ -180,15 +179,15 @@ def order(product_id):
                 return render_template('order.html', product=product)
             
             order = Order(
-                buyer_name=buyer_name,
-                buyer_email=buyer_email,
+                buyer_name=current_user.name,
+                buyer_email=current_user.email,
                 product_id=product_id,
                 quantity=quantity
             )
             product.quantity -= quantity
             db.session.add(order)
             db.session.commit()
-            logger.info(f"Order placed for product ID: {product_id} by {buyer_email}")
+            logger.info(f"Order placed for product ID: {product_id} by {current_user.email}")
             flash('Order placed successfully!', 'success')
             return redirect(url_for('index'))
         
@@ -236,6 +235,44 @@ def add_product():
         return redirect(url_for('profile', farmer_id=current_user.id))
     except Exception as e:
         logger.error(f"Error adding product: {e}")
+        db.session.rollback()
+        flash('An error occurred, please try again', 'error')
+        return redirect(url_for('profile', farmer_id=current_user.id))
+
+@app.route('/update_order_status/<int:order_id>', methods=['POST'])
+@login_required
+def update_order_status(order_id):
+    try:
+        order = Order.query.get_or_404(order_id)
+        # Verify the order belongs to the farmer
+        product = Product.query.get_or_404(order.product_id)
+        if product.farmer_id != current_user.id:
+            flash('Unauthorized to update this order', 'error')
+            return redirect(url_for('profile', farmer_id=current_user.id))
+        
+        # Check if order is already Completed
+        if order.status == 'Completed':
+            flash('Cannot change status of a completed order', 'error')
+            return redirect(url_for('profile', farmer_id=current_user.id))
+        
+        data = request.form
+        new_status = data.get('status')
+        
+        if not new_status:
+            flash('Status is required', 'error')
+            return redirect(url_for('profile', farmer_id=current_user.id))
+        
+        if new_status not in ['Pending', 'Completed', 'Cancelled']:
+            flash('Invalid status', 'error')
+            return redirect(url_for('profile', farmer_id=current_user.id))
+        
+        order.status = new_status
+        db.session.commit()
+        logger.info(f"Updated order ID: {order_id} to status: {new_status} by farmer ID: {current_user.id}")
+        flash('Order status updated successfully!', 'success')
+        return redirect(url_for('profile', farmer_id=current_user.id))
+    except Exception as e:
+        logger.error(f"Error updating order status for order {order_id}: {e}")
         db.session.rollback()
         flash('An error occurred, please try again', 'error')
         return redirect(url_for('profile', farmer_id=current_user.id))
@@ -356,10 +393,11 @@ def get_products():
         return jsonify({'error': 'Failed to retrieve products'}), 500
 
 @app.route('/api/orders', methods=['POST'])
+@login_required
 def place_order():
     try:
         data = request.get_json()
-        if not data or not all(key in data for key in ['buyer_name', 'buyer_email', 'product_id', 'quantity']):
+        if not data or not all(key in data for key in ['product_id', 'quantity']):
             return jsonify({'error': 'Missing required fields'}), 400
         
         product = Product.query.get_or_404(data['product_id'])
@@ -368,15 +406,15 @@ def place_order():
             return jsonify({'error': 'Insufficient quantity'}), 400
         
         order = Order(
-            buyer_name=data['buyer_name'],
-            buyer_email=data['buyer_email'],
+            buyer_name=current_user.name,
+            buyer_email=current_user.email,
             product_id=data['product_id'],
             quantity=data['quantity']
         )
         product.quantity -= data['quantity']
         db.session.add(order)
         db.session.commit()
-        logger.info(f"Placed order for product ID: {data['product_id']}")
+        logger.info(f"Placed order for product ID: {data['product_id']} by {current_user.email}")
         return jsonify({'message': 'Order placed successfully', 'id': order.id}), 201
     except Exception as e:
         logger.error(f"Error placing order: {e}")
@@ -403,6 +441,38 @@ def get_farmer_orders(farmer_id):
     except Exception as e:
         logger.error(f"Error retrieving orders for farmer {farmer_id}: {e}")
         return jsonify({'error': 'Failed to retrieve orders'}), 500
+
+@app.route('/api/orders/<int:order_id>/status', methods=['PUT'])
+@login_required
+def api_update_order_status(order_id):
+    try:
+        order = Order.query.get_or_404(order_id)
+        # Verify the order belongs to the farmer
+        product = Product.query.get_or_404(order.product_id)
+        if product.farmer_id != current_user.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        # Check if order is already Completed
+        if order.status == 'Completed':
+            return jsonify({'error': 'Cannot change status of a completed order'}), 400
+        
+        data = request.get_json()
+        new_status = data.get('status')
+        
+        if not new_status:
+            return jsonify({'error': 'Status is required'}), 400
+        
+        if new_status not in ['Pending', 'Completed', 'Cancelled']:
+            return jsonify({'error': 'Invalid status'}), 400
+        
+        order.status = new_status
+        db.session.commit()
+        logger.info(f"Updated order ID: {order_id} to status: {new_status} via API")
+        return jsonify({'message': 'Order status updated successfully'}), 200
+    except Exception as e:
+        logger.error(f"Error updating order status via API for order {order_id}: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to update order status'}), 500
 
 if __name__ == '__main__':
     logger.info(f"Starting Flask app with database: {DB_PATH}")
