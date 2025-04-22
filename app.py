@@ -65,6 +65,18 @@ def index():
         logger.error(f"Error querying products: {e}")
         return jsonify({'error': 'Database error, please try again later'}), 500
 
+@app.route('/profile/<int:farmer_id>')
+def profile(farmer_id):
+    try:
+        farmer = Farmer.query.get_or_404(farmer_id)
+        products = Product.query.filter_by(farmer_id=farmer_id).all()
+        orders = Order.query.join(Product).filter(Product.farmer_id == farmer_id).all()
+        logger.info(f"Retrieved profile for farmer ID: {farmer_id}")
+        return render_template('profile.html', farmer=farmer, products=products, orders=orders)
+    except OperationalError as e:
+        logger.error(f"Error retrieving profile for farmer {farmer_id}: {e}")
+        return jsonify({'error': 'Database error, please try again later'}), 500
+
 @app.route('/api/farmers/register', methods=['POST'])
 def register_farmer():
     try:
@@ -89,6 +101,25 @@ def register_farmer():
         logger.error(f"Error registering farmer: {e}")
         db.session.rollback()
         return jsonify({'error': 'Failed to register farmer'}), 500
+
+@app.route('/api/farmers/<int:farmer_id>', methods=['PUT'])
+def update_farmer(farmer_id):
+    try:
+        data = request.get_json()
+        farmer = Farmer.query.get_or_404(farmer_id)
+        
+        if 'phone' in data:
+            farmer.phone = data['phone']
+        if 'address' in data:
+            farmer.address = data['address']
+        
+        db.session.commit()
+        logger.info(f"Updated profile for farmer ID: {farmer_id}")
+        return jsonify({'message': 'Farmer profile updated successfully'}), 200
+    except Exception as e:
+        logger.error(f"Error updating farmer {farmer_id}: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to update profile'}), 500
 
 @app.route('/api/products', methods=['POST'])
 def add_product():
