@@ -111,4 +111,21 @@
             }
             
             try {
-                const response = await fetch(`/api/farmers/${farmerId}`,
+                const response = await fetch(`/api/farmers/${farmerId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                alert(result.message || result.error);
+                if (response.ok) {
+                    window.location.reload();
+                }
+            } catch (error) {
+                alert('Error updating profile');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
