@@ -98,6 +98,14 @@ def index():
         logger.error(f"Error querying products: {e}")
         return jsonify({'error': 'Database error, please try again later'}), 500
 
+@app.route('/dashboard/contact')
+def contact():
+    return render_template('contact_us.html')
+
+@app.route('/dashboard/insights')
+def insights():
+    return render_template('insights.html')
+
 @app.route('/dashboard')
 @login_required
 def dashboard():

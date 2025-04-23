@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}Insights for Ramesh Sharma{% endblock %}
+
+{% block content %}
+<script type="text/javascript">
+    var gk_isXlsx = false;
+    var gk_xlsxFileLookup = {};
+    var gk_fileData = {};
+    function filledCell(cell) {
+      return cell !== '' && cell != null;
+    }
+    function loadFileData(filename) {
+    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+        try {
+            var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+            var firstSheetName = workbook.SheetNames[0];
+            var worksheet = workbook.Sheets[firstSheetName];
+            var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+            var filteredData = jsonData.filter(row => row.some(filledCell));
+            var headerRowIndex = filteredData.findIndex((row, index) =>
+              row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+            );
+            if (headerRowIndex === -1 || headerRowIndex > 25) {
+              headerRowIndex = 0;
+            }
+            var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+            csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+            return csv;
+        } catch (e) {
+            console.error(e);
+            return "";
+        }
+    }
+    return gk_fileData[filename] || "";
+    }
+</script>
+
+<div class="bg-white p-8 rounded-lg shadow-lg mb-8">
+    <h2 class="text-3xl font-bold text-green-800 mb-4 text-center">Insights for Ramesh Sharma</h2>
+    <p class="text-gray-600 text-center mb-6">Based on your location: 123 MG Road, Bhopal, Madhya Pradesh</p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Product Recommendations -->
+        <div>
+            <h3 class="text-xl font-semibold text-green-800 mb-4">Recommended Products from Local Farmers</h3>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h4 class="text-lg font-semibold text-gray-700 mb-3">Products Available in Madhya Pradesh</h4>
+                <ul class="space-y-2">
+                    <li class="text-gray-600"><strong>Indore Chickpea</strong> by Sita Patel (Indore) - ₹2.00/kg, 120 units available</li>
+                    <li class="text-gray-600"><strong>Soybean Oil</strong> by Sita Patel (Indore) - ₹5.00/ltr, 50 units available</li>
+                    <li class="text-gray-600"><strong>Jabalpur Rice</strong> by Vikram Singh (Jabalpur) - ₹3.20/kg, 80 units available</li>
+                    <li class="text-gray-600"><strong>Ujjain Pulses</strong> by Anita Yadav (Ujjain) - ₹1.50/kg, 90 units available</li>
+                    <li class="text-gray-600"><strong>Gwalior Maize</strong> by Kiran Gupta (Gwalior) - ₹1.80/kg, 110 units available</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Crop Recommendations -->
+        <div>
+            <h3 class="text-xl font-semibold text-green-800 mb-4">Crop Recommendations for Bhopal, Madhya Pradesh</h3>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h4 class="text-lg font-semibold text-gray-700 mb-3">Suggested Crops, Seeds, Fertilizers, and Techniques</h4>
+                <ul class="space-y-4">
+                    <li class="text-gray-600">
+                        <strong>Soybean (Bhopal)</strong><br>
+                        Recommended Seeds: HYV Soybean JS 335<br>
+                        Best Fertilizers: NPK, Gypsum<br>
+                        Irrigation Technique: Drip Irrigation<br>
+                        Yield Estimate: 2.5 tons/ha<br>
+                        Suitability Score: 85
+                    </li>
+                    <li class="text-gray-600">
+                        <strong>Wheat (Indore)</strong><br>
+                        Recommended Seeds: Durum Wheat HD 2967<br>
+                        Best Fertilizers: NPK, Organic Manure<br>
+                        Irrigation Technique: Flood Irrigation<br>
+                        Yield Estimated: 3.0 tons/ha<br>
+                        Suitability Score: 88
+                    </li>
+                    <li class="text-gray-600">
+                        <strong>Rice (Jabalpur)</strong><br>
+                        Recommended Seeds: HYV IR 64<br>
+                        Best Fertilizers: NPK, Urea<br>
+                        Irrigation Technique: Flood Irrigation<br>
+                        Yield Estimate: 2.8 tons/ha<br>
+                        Suitability Score: 82
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Profit Graph -->
+<div class="bg-white p-8 rounded-lg shadow-lg">
+    <h3 class="text-xl font-semibold text-green-800 mb-4 text-center">Estimated Profits for Recommended Crops (₹/ha)</h3>
+    <div class="max-w-2xl mx-auto">
+        <canvas id="profitChart"></canvas>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Bar graph for estimated profits
+    const ctx = document.getElementById('profitChart').getContext('2d');
+    const profitChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Soybean', 'Wheat', 'Rice'],
+            datasets: [{
+                label: 'Estimated Profit (₹/ha)',
+                data: [37500, 45000, 39200],
+                backgroundColor: ['#28a745', '#007bff', '#dc3545'],
+                borderColor: ['#218838', '#0056b3', '#c82333'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Profit (₹/ha)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Crop'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
