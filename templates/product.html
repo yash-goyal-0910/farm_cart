@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Product{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-lg">
+    <h2 class="text-3xl font-bold text-green-800 mb-6 text-center">Edit Product: {{ product.name }}</h2>
+    <form method="POST" action="{{ url_for('product', product_id=product.id) }}" class="space-y-6">
+        <div class="relative">
+            <input type="text" id="name" name="name" value="{{ product.name }}" required class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500">
+            <label for="name" class="absolute -top-2 left-3 bg-white px-1 text-sm text-gray-600">Product Name</label>
+        </div>
+        <div class="relative">
+            <textarea id="description" name="description" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500">{{ product.description or '' }}</textarea>
+            <label for="description" class="absolute -top-2 left-3 bg-white px-1 text-sm text-gray-600">Description</label>
+        </div>
+        <div class="relative">
+            <input type="number" id="price" name="price" value="{{ product.price }}" required step="0.01" min="0" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500">
+            <label for="price" class="absolute -top-2 left-3 bg-white px-1 text-sm text-gray-600">Price (₹)</label>
+        </div>
+        <div class="relative">
+            <input type="number" id="quantity" name="quantity" value="{{ product.quantity }}" required min="0" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500">
+            <label for="quantity" class="absolute -top-2 left-3 bg-white px-1 text-sm text-gray-600">Quantity</label>
+        </div>
+        <div class="relative">
+            <select id="shipping_option" name="shipping_option" required class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500">
+                <option value="Self Ship" {% if product.shipping_option == 'Self Ship' %}selected{% endif %}>Self Ship</option>
+                <option value="Shiprocket" {% if product.shipping_option == 'Shiprocket' %}selected{% endif %}>Shiprocket</option>
+            </select>
+            <label for="shipping_option" class="absolute -top-2 left-3 bg-white px-1 text-sm text-gray-600">Shipping Option</label>
+        </div>
+        <button type="submit" class="btn-primary w-full p-3 rounded-lg text-white">Update Product</button>
+    </form>
+    <a href="{{ url_for('profile', farmer_id=current_user.id) }}" class="mt-4 inline-block text-orange-500 hover:underline">Back to Profile</a>
+</div>
+{% endblock %}

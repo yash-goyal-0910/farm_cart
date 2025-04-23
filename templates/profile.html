@@ -72,6 +72,7 @@
                     <p class="text-orange-600 font-bold">₹{{ product.price }}</p>
                     <p class="text-gray-500 text-sm">Available: {{ product.quantity }} units</p>
                     <p class="text-gray-500 text-sm">Shipping: {{ product.shipping_option }}</p>
+                    <a href="{{ url_for('product', product_id=product.id) }}" class="mt-4 text-orange-500 hover:underline">Edit Product</a>
                 </div>
             {% endfor %}
         </div>
@@ -80,11 +81,11 @@
     {% endif %}
 </div>
 
-<div class="bg-white p-8 rounded-lg shadow-lg">
-    <h3 class="text-xl font-semibold text-green-800 mb-4">Your Orders</h3>
-    {% if orders %}
+<div class="bg-white p-8 rounded-lg shadow-lg mb-8">
+    <h3 class="text-xl font-semibold text-green-800 mb-4">Orders Received (As Seller)</h3>
+    {% if seller_orders %}
         <div class="space-y-6">
-            {% for order in orders %}
+            {% for order in seller_orders %}
                 <div class="card bg-white p-6 rounded-lg shadow">
                     <p class="text-gray-600"><strong>Order ID:</strong> {{ order.id }}</p>
                     <p class="text-gray-600"><strong>Buyer:</strong> {{ order.buyer_name }}</p>
@@ -108,7 +109,26 @@
             {% endfor %}
         </div>
     {% else %}
-        <p class="text-gray-600">No orders yet.</p>
+        <p class="text-gray-600">No orders received yet.</p>
+    {% endif %}
+</div>
+
+<div class="bg-white p-8 rounded-lg shadow-lg">
+    <h3 class="text-xl font-semibold text-green-800 mb-4">Orders Placed (As Buyer)</h3>
+    {% if buyer_orders %}
+        <div class="space-y-6">
+            {% for order in buyer_orders %}
+                <div class="card bg-white p-6 rounded-lg shadow">
+                    <p class="text-gray-600"><strong>Order ID:</strong> {{ order.id }}</p>
+                    <p class="text-gray-600"><strong>Product:</strong> {{ order.product.name }}</p>
+                    <p class="text-gray-600"><strong>Quantity:</strong> {{ order.quantity }}</p>
+                    <p class="text-gray-600"><strong>Status:</strong> {{ order.status }}</p>
+                    <p class="text-gray-600"><strong>Date:</strong> {{ order.order_date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-gray-600">No orders placed yet.</p>
     {% endif %}
 </div>
 {% endblock %}
