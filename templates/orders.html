@@ -1,0 +1,130 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>{% extends 'base.html' %}
+
+{% block title %}Your Orders{% endblock %}
+
+{% block content %}
+<script type="text/javascript">
+    var gk_isXlsx = false;
+    var gk_xlsxFileLookup = {};
+    var gk_fileData = {};
+    function filledCell(cell) {
+      return cell !== '' && cell != null;
+    }
+    function loadFileData(filename) {
+    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+        try {
+            var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+            var firstSheetName = workbook.SheetNames[0];
+            var worksheet = workbook.Sheets[firstSheetName];
+            var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+            var filteredData = jsonData.filter(row => row.some(filledCell));
+            var headerRowIndex = filteredData.findIndex((row, index) =>
+              row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+            );
+            if (headerRowIndex === -1 || headerRowIndex > 25) {
+              headerRowIndex = 0;
+            }
+            var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+            csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+            return csv;
+        } catch (e) {
+            console.error(e);
+            return "";
+        }
+    }
+    return gk_fileData[filename] || "";
+    }
+</script>
+
+<div class="bg-white p-8 rounded-lg shadow-lg">
+    <h2 class="text-3xl font-bold text-green-800 mb-6">Your Orders</h2>
+
+    <!-- Orders Received (As Seller) -->
+    <h3 class="text-xl font-semibold text-green-800 mb-4">Orders Received (As Seller)</h3>
+    {% if seller_orders %}
+        <div class="space-y-6">
+            {% for order in seller_orders %}
+                <div class="card bg-white p-6 rounded-lg shadow">
+                    <p class="text-gray-600"><strong>Order ID:</strong> {{ order.id }}</p>
+                    <p class="text-gray-600"><strong>Buyer:</strong> {{ order.buyer_name }}</p>
+                    <p class="text-gray-600"><strong>Product:</strong> {{ order.product.name }}</p>
+                    <p class="text-gray-600"><strong>Quantity:</strong> {{ order.quantity }}</p>
+                    <p class="text-gray-600"><strong>Status:</strong> {{ order.status }}</p>
+                    <p class="text-gray-600"><strong>Date:</strong> {{ order.order_date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                    {% if order.status != 'Completed' %}
+                        <form method="POST" action="{{ url_for('update_order_status', order_id=order.id) }}" class="mt-4 flex gap-2">
+                            <select name="status" class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500">
+                                <option value="Pending" {% if order.status == 'Pending' %}selected{% endif %}>Pending</option>
+                                <option value="Completed" {% if order.status == 'Completed' %}selected{% endif %}>Completed</option>
+                                <option value="Cancelled" {% if order.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                            </select>
+                            <button type="submit" class="btn-primary p-2 rounded-lg text-white">Update Status</button>
+                        </form>
+                    {% else %}
+                        <p class="text-gray-600 mt-4">Completed (Locked)</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-gray-600">No orders received yet.</p>
+    {% endif %}
+
+    <!-- Orders Placed (As Buyer) -->
+    <h3 class="text-xl font-semibold text-green-800 mt-8 mb-4">Orders Placed (As Buyer)</h3>
+    {% if buyer_orders %}
+        <div class="space-y-6">
+            {% for order in buyer_orders %}
+                <div class="card bg-white p-6 rounded-lg shadow">
+                    <p class="text-gray-600"><strong>Order ID:</strong> {{ order.id }}</p>
+                    <p class="text-gray-600"><strong>Product:</strong> {{ order.product.name }}</p>
+                    <p class="text-gray-600"><strong>Quantity:</strong> {{ order.quantity }}</p>
+                    <p class="text-gray-600"><strong>Status:</strong> {{ order.status }}</p>
+                    <p class="text-gray-600"><strong>Date:</strong> {{ order.order_date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-gray-600">No orders placed yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

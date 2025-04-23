@@ -1,0 +1,131 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>{% extends 'base.html' %}
+
+{% block title %}Your Products{% endblock %}
+
+{% block content %}
+<script type="text/javascript">
+    var gk_isXlsx = false;
+    var gk_xlsxFileLookup = {};
+    var gk_fileData = {};
+    function filledCell(cell) {
+      return cell !== '' && cell != null;
+    }
+    function loadFileData(filename) {
+    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+        try {
+            var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+            var firstSheetName = workbook.SheetNames[0];
+            var worksheet = workbook.Sheets[firstSheetName];
+            var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+            var filteredData = jsonData.filter(row => row.some(filledCell));
+            var headerRowIndex = filteredData.findIndex((row, index) =>
+              row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+            );
+            if (headerRowIndex === -1 || headerRowIndex > 25) {
+              headerRowIndex = 0;
+            }
+            var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+            csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+            return csv;
+        } catch (e) {
+            console.error(e);
+            return "";
+        }
+    }
+    return gk_fileData[filename] || "";
+    }
+</script>
+
+<div class="bg-white p-8 rounded-lg shadow-lg mb-8">
+    <h2 class="text-3xl font-bold text-green-800 mb-6">Manage Your Products</h2>
+
+    <!-- Add New Product Form -->
+    <h3 class="text-xl font-semibold text-green-800 mb-4">Add New Product</h3>
+    <form method="POST" action="{{ url_for('add_product') }}" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="relative">
+            <input type="text" id="name" name="name" required class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500">
+            <label for="name" class="absolute -top-2 left-3 bg-white px-1 text-sm text-gray-600">Product Name</label>
+        </div>
+        <div class="relative">
+            <textarea id="description" name="description" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500"></textarea>
+            <label for="description" class="absolute -top-2 left-3 bg-white px-1 text-sm text-gray-600">Description</label>
+        </div>
+        <div class="relative">
+            <input type="number" id="price" name="price" required step="0.01" min="0" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500">
+            <label for="price" class="absolute -top-2 left-3 bg-white px-1 text-sm text-gray-600">Price (₹)</label>
+        </div>
+        <div class="relative">
+            <input type="number" id="quantity" name="quantity" required min="0" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500">
+            <label for="quantity" class="absolute -top-2 left-3 bg-white px-1 text-sm text-gray-600">Quantity</label>
+        </div>
+        <div class="relative">
+            <select id="shipping_option" name="shipping_option" required class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500">
+                <option value="" disabled selected>Select a shipping option</option>
+                <option value="Self Ship">Self Ship</option>
+                <option value="Shiprocket">Shiprocket</option>
+            </select>
+            <label for="shipping_option" class="absolute -top-2 left-3 bg-white px-1 text-sm text-gray-600">Shipping Option</label>
+        </div>
+        <button type="submit" class="btn-primary p-3 rounded-lg text-white md:col-span-2">Add Product</button>
+    </form>
+</div>
+
+<div class="bg-white p-8 rounded-lg shadow-lg">
+    <h3 class="text-xl font-semibold text-green-800 mb-4">Your Products</h3>
+    {% if products %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for product in products %}
+                <div class="card bg-white p-6 rounded-lg shadow">
+                    <h4 class="text-lg font-semibold text-green-800">{{ product.name }}</h4>
+                    <p class="text-gray-600 text-sm">{{ product.description or 'No description' }}</p>
+                    <p class="text-orange-600 font-bold">₹{{ product.price }}</p>
+                    <p class="text-gray-500 text-sm">Available: {{ product.quantity }} units</p>
+                    <p class="text-gray-500 text-sm">Shipping: {{ product.shipping_option }}</p>
+                    <a href="{{ url_for('product', product_id=product.id) }}" class="mt-4 text-orange-500 hover:underline">Edit Product</a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-gray-600">No products added yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -110,10 +110,35 @@ def insights():
 @login_required
 def dashboard():
     try:
+        product_count = Product.query.filter_by(farmer_id=current_user.id).count()
+        order_count = Order.query.join(Product).filter(Product.farmer_id == current_user.id).count()
         logger.info(f"Retrieved dashboard for farmer ID: {current_user.id}")
-        return render_template('dashboard.html')
+        return render_template('dashboard.html', product_count=product_count, order_count=order_count)
     except OperationalError as e:
         logger.error(f"Error retrieving dashboard: {e}")
+        return jsonify({'error': 'Database error, please try again later'}), 500
+
+@app.route('/products')
+@login_required
+def products():
+    try:
+        products = Product.query.filter_by(farmer_id=current_user.id).all()
+        logger.info(f"Retrieved {len(products)} products for farmer ID: {current_user.id}")
+        return render_template('products.html', products=products)
+    except OperationalError as e:
+        logger.error(f"Error retrieving products: {e}")
+        return jsonify({'error': 'Database error, please try again later'}), 500
+
+@app.route('/orders')
+@login_required
+def orders():
+    try:
+        seller_orders = Order.query.join(Product).filter(Product.farmer_id == current_user.id).all()
+        buyer_orders = Order.query.filter_by(buyer_email=current_user.email).all()
+        logger.info(f"Retrieved {len(seller_orders)} seller orders and {len(buyer_orders)} buyer orders for farmer ID: {current_user.id}")
+        return render_template('orders.html', seller_orders=seller_orders, buyer_orders=buyer_orders)
+    except OperationalError as e:
+        logger.error(f"Error retrieving orders: {e}")
         return jsonify({'error': 'Database error, please try again later'}), 500
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -276,19 +301,19 @@ def add_product():
         shipping_option = data.get('shipping_option')
         if not all([name, price, quantity, shipping_option]):
             flash('Name, price, quantity, and shipping option are required', 'error')
-            return redirect(url_for('profile', farmer_id=current_user.id))
+            return redirect(url_for('products'))
         if shipping_option not in ['Self Ship', 'Shiprocket']:
             flash('Invalid shipping option', 'error')
-            return redirect(url_for('profile', farmer_id=current_user.id))
+            return redirect(url_for('products'))
         try:
             price = float(price)
             quantity = int(quantity)
             if price <= 0 or quantity <= 0:
                 flash('Price and quantity must be greater than zero', 'error')
-                return redirect(url_for('profile', farmer_id=current_user.id))
+                return redirect(url_for('products'))
         except ValueError:
             flash('Price and quantity must be valid numbers', 'error')
-            return redirect(url_for('profile', farmer_id=current_user.id))
+            return redirect(url_for('products'))
         product = Product(
             name=name,
             description=description,
@@ -301,12 +326,12 @@ def add_product():
         db.session.commit()
         logger.info(f"Added product: {name} by farmer ID: {current_user.id} with shipping: {shipping_option}")
         flash('Product added successfully!', 'success')
-        return redirect(url_for('profile', farmer_id=current_user.id))
+        return redirect(url_for('products'))
     except Exception as e:
         logger.error(f"Error adding product: {e}")
         db.session.rollback()
         flash('An error occurred, please try again', 'error')
-        return redirect(url_for('profile', farmer_id=current_user.id))
+        return redirect(url_for('products'))
 
 @app.route('/update_order_status/<int:order_id>', methods=['POST'])
 @login_required
@@ -316,28 +341,28 @@ def update_order_status(order_id):
         product = Product.query.get_or_404(order.product_id)
         if product.farmer_id != current_user.id:
             flash('Unauthorized to update this order', 'error')
-            return redirect(url_for('profile', farmer_id=current_user.id))
+            return redirect(url_for('orders'))
         if order.status == 'Completed':
             flash('Cannot change status of a completed order', 'error')
-            return redirect(url_for('profile', farmer_id=current_user.id))
+            return redirect(url_for('orders'))
         data = request.form
         new_status = data.get('status')
         if not new_status:
             flash('Status is required', 'error')
-            return redirect(url_for('profile', farmer_id=current_user.id))
+            return redirect(url_for('orders'))
         if new_status not in ['Pending', 'Completed', 'Cancelled']:
             flash('Invalid status', 'error')
-            return redirect(url_for('profile', farmer_id=current_user.id))
+            return redirect(url_for('orders'))
         order.status = new_status
         db.session.commit()
         logger.info(f"Updated order ID: {order_id} to status: {new_status} by farmer ID: {current_user.id}")
         flash('Order status updated successfully!', 'success')
-        return redirect(url_for('profile', farmer_id=current_user.id))
+        return redirect(url_for('orders'))
     except Exception as e:
         logger.error(f"Error updating order status for order {order_id}: {e}")
         db.session.rollback()
         flash('An error occurred, please try again', 'error')
-        return redirect(url_for('profile', farmer_id=current_user.id))
+        return redirect(url_for('orders'))
 
 @app.route('/logout')
 @login_required
@@ -357,9 +382,7 @@ def profile(farmer_id):
     try:
         farmer = Farmer.query.get_or_404(farmer_id)
         products = Product.query.filter_by(farmer_id=farmer_id).all()
-        # Orders where farmer is the seller (products they own)
         seller_orders = Order.query.join(Product).filter(Product.farmer_id == farmer_id).all()
-        # Orders where farmer is the buyer
         buyer_orders = Order.query.filter_by(buyer_email=farmer.email).all()
         logger.info(f"Retrieved profile for farmer ID: {farmer_id}")
         return render_template('profile.html', farmer=farmer, products=products, seller_orders=seller_orders, buyer_orders=buyer_orders)
